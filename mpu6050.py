@@ -84,28 +84,28 @@ class MPU6050:
 
         self.__write_to_mem(POWER_MANAGEMENT_1_REG_ADDR, pwr_management_reg)
 
-    def __reset(self):
+    def __reset_device(self):
         pwr_management_reg = self.__read_from_mem(POWER_MANAGEMENT_1_REG_ADDR)[0]
         pwr_management_reg = pwr_management_reg | (1 << 7)
 
         self.__write_to_mem(POWER_MANAGEMENT_1_REG_ADDR, pwr_management_reg)
 
-    def reset_device(self):
-        self.__reset()
+    def reset(self):
+        self.__reset_device()
         self.__wake_up()
 
     def __update_measurements_ranges(self):
-        self.accelerometer_range = self.__get_measurements_range(ACCELEROMETER_CONFIG_REG_ADDR)
-        self.gyro_range = self.__get_measurements_range(GYRO_CONFIG_REG_ADDR)
-
         self.__set_measurements_range(ACCELEROMETER_CONFIG_REG_ADDR, self.accelerometer_range)
         self.__set_measurements_range(GYRO_CONFIG_REG_ADDR, self.gyro_range)
+
+        self.accelerometer_range = self.__get_measurements_range(ACCELEROMETER_CONFIG_REG_ADDR)
+        self.gyro_range = self.__get_measurements_range(GYRO_CONFIG_REG_ADDR)
 
         self.accelerometer_lsb_sensitivity = ACCELEROMETER_LSB_SENSITIVITY[self.accelerometer_range]
         self.gyro_lsb_sensitivity = GYRO_LSB_SENSITIVITY[self.gyro_range]
 
     def initialize_device(self):
-        self.reset_device()
+        self.reset()
         self.__update_measurements_ranges()
 
     def __write_to_mem(self, reg_address: int, data: bytearray | int, delay=50):

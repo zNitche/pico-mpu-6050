@@ -16,6 +16,7 @@ def main():
         mpu6050.start()
 
         print(f"Accelerometer range: {mpu6050.accelerometer_range}")
+        print(f"Gyro range: {mpu6050.gyro_range}")
 
         for _ in range(50):
             acc = round_readings(mpu6050.get_acceleration())
