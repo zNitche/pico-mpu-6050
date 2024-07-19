@@ -7,7 +7,8 @@ DEVICE_ID_REG_ADDR = const(0x75)
 DEVICE_ADDRESS = const(0x68)
 POWER_MANAGEMENT_1_REG_ADDR = const(0x6B)
 
-TEMP_REG_ADDR = const(0x41)
+TEMP_DATA_REG_ADDR = const(0x41)
+
 ACCELEROMETER_DATA_REG_ADDR = const(0x3B)
 ACCELEROMETER_CONFIG_REG_ADDR = const(0x1C)
 
@@ -16,21 +17,44 @@ RANGE_4G = const(1)
 RANGE_8G = const(2)
 RANGE_16G = const(3)
 
-LSB_SENSITIVITY = {
+ACCELEROMETER_LSB_SENSITIVITY = {
     RANGE_2G: 16384,
     RANGE_4G: 8192,
     RANGE_8G: 4096,
     RANGE_16G: 2048
 }
 
+GYRO_DATA_REG_ADDR = const(0x43)
+GYRO_CONFIG_REG_ADDR = const(0x1B)
+
+RANGE_250 = const(0)
+RANGE_500 = const(1)
+RANGE_1000 = const(2)
+RANGE_2000 = const(3)
+
+GYRO_LSB_SENSITIVITY = {
+    RANGE_250: 131,
+    RANGE_500: 65.5,
+    RANGE_1000: 32.8,
+    RANGE_2000: 16.4
+}
+
 
 class MPU6050:
-    def __init__(self, i2c: machine.I2C, address=DEVICE_ADDRESS, range=RANGE_2G):
+    def __init__(self,
+                 i2c: machine.I2C,
+                 address=DEVICE_ADDRESS,
+                 accelerometer_range=RANGE_2G,
+                 gyro_range=RANGE_250):
+
         self.i2c = i2c
         self.address = address
 
-        self.accelerometer_range = range
-        self.current_lsb_sensitivity = LSB_SENSITIVITY[self.accelerometer_range]
+        self.accelerometer_range = accelerometer_range
+        self.gyro_range = gyro_range
+
+        self.accelerometer_lsb_sensitivity = ACCELEROMETER_LSB_SENSITIVITY[accelerometer_range]
+        self.gyro_lsb_sensitivity = GYRO_LSB_SENSITIVITY[gyro_range]
 
     def __wake_up(self):
         # datasheet page no.41 for clock source
@@ -42,9 +66,13 @@ class MPU6050:
         self.reset()
         self.__wake_up()
 
-        self.__set_accelerometer_range(self.accelerometer_range)
         self.accelerometer_range = self.get_accelerometer_range()
-        self.current_lsb_sensitivity = LSB_SENSITIVITY[self.accelerometer_range]
+        self.__set_accelerometer_range(self.accelerometer_range)
+        self.accelerometer_lsb_sensitivity = ACCELEROMETER_LSB_SENSITIVITY[self.accelerometer_range]
+
+        self.accelerometer_range = self.get_gyro_range()
+        self.__set_gyro_range(self.gyro_range)
+        self.gyro_lsb_sensitivity = GYRO_LSB_SENSITIVITY[self.gyro_range]
 
     def __write_to_mem(self, reg_address: int, data: bytearray | int, delay=50):
         if isinstance(data, int):
@@ -85,6 +113,14 @@ class MPU6050:
 
         return (range_b1 << 1) | range_b0
 
+    def get_gyro_range(self) -> int:
+        config_reg = self.__read_from_mem(GYRO_CONFIG_REG_ADDR)[0]
+
+        range_b0 = (config_reg >> 3) & 1
+        range_b1 = (config_reg >> 4) & 1
+
+        return (range_b1 << 1) | range_b0
+
     def __set_accelerometer_range(self, range: int):
         config_reg = self.__read_from_mem(ACCELEROMETER_CONFIG_REG_ADDR)[0]
 
@@ -96,6 +132,18 @@ class MPU6050:
         config_reg = config_reg | (range << 3)
 
         self.__write_to_mem(ACCELEROMETER_CONFIG_REG_ADDR, config_reg)
+
+    def __set_gyro_range(self, range: int):
+        config_reg = self.__read_from_mem(GYRO_CONFIG_REG_ADDR)[0]
+
+        # set range bits to 0
+        config_reg = config_reg & ~ (1 << 3)
+        config_reg = config_reg & ~ (1 << 4)
+
+        # set proper bits for selected range
+        config_reg = config_reg | (range << 3)
+
+        self.__write_to_mem(GYRO_CONFIG_REG_ADDR, config_reg)
 
     def reset(self):
         pwr_management_reg = self.__read_from_mem(POWER_MANAGEMENT_1_REG_ADDR)[0]
@@ -111,7 +159,7 @@ class MPU6050:
         self.__toggle_is_running(False)
 
     def get_temperature(self) -> float:
-        buff = self.__read_from_mem(TEMP_REG_ADDR, 2)
+        buff = self.__read_from_mem(TEMP_DATA_REG_ADDR, 2)
         raw_temp = struct.unpack(">h", buff)[0]
 
         return raw_temp / 340 + 36.53
@@ -119,6 +167,13 @@ class MPU6050:
     def get_acceleration(self) -> tuple[float, float, float]:
         buff = self.__read_from_mem(ACCELEROMETER_DATA_REG_ADDR, 6)
         raw_data_struct = struct.unpack(">hhh", buff)
-        processed_data = [val / self.current_lsb_sensitivity for val in raw_data_struct]
+        processed_data = [val / self.accelerometer_lsb_sensitivity for val in raw_data_struct]
+
+        return processed_data[0], processed_data[1], processed_data[2]
+
+    def get_gyro(self) -> tuple[float, float, float]:
+        buff = self.__read_from_mem(GYRO_DATA_REG_ADDR, 6)
+        raw_data_struct = struct.unpack(">hhh", buff)
+        processed_data = [val / self.gyro_lsb_sensitivity for val in raw_data_struct]
 
         return processed_data[0], processed_data[1], processed_data[2]
