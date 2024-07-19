@@ -7,6 +7,7 @@ DEVICE_ID_REG_ADDR = const(0x75)
 DEVICE_ADDRESS = const(0x68)
 POWER_MANAGEMENT_1_REG_ADDR = const(0x6B)
 
+TEMP_REG_ADDR = const(0x41)
 ACCELEROMETER_DATA_REG_ADDR = const(0x3B)
 ACCELEROMETER_CONFIG_REG_ADDR = const(0x1C)
 
@@ -108,6 +109,12 @@ class MPU6050:
 
     def stop(self):
         self.__toggle_is_running(False)
+
+    def get_temperature(self) -> float:
+        buff = self.__read_from_mem(TEMP_REG_ADDR, 2)
+        raw_temp = struct.unpack(">h", buff)[0]
+
+        return raw_temp / 340 + 36.53
 
     def get_acceleration(self) -> tuple[float, float, float]:
         buff = self.__read_from_mem(ACCELEROMETER_DATA_REG_ADDR, 6)

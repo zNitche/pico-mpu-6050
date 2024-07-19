@@ -13,6 +13,8 @@ def main():
         print(f"Accelerometer range: {mpu6050.accelerometer_range}")
 
         for _ in range(50):
+            print(f"Temp: {round(mpu6050.get_temperature(), 2)}")
+
             acc = [round(i, 1) for i in mpu6050.get_acceleration()]
             print(f"X:{acc[0]} | Y:{acc[1]} | Z:{acc[2]}")
 
